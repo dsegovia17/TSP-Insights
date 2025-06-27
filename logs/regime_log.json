@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp": "2025-06-26T20:35:24.853992",
+    "value": {
+      "Expansion": 0.0,
+      "Recovery": 0.0,
+      "Neutral": 0.0,
+      "Contraction": 0.0,
+      "Crisis": 0.0
+    }
+  },
+  {
+    "timestamp": "2025-06-26T20:49:57.132304",
+    "value": {
+      "Expansion": 0.0,
+      "Recovery": 0.0,
+      "Neutral": 0.0,
+      "Contraction": 0.0,
+      "Crisis": 0.0
+    }
+  }
+]

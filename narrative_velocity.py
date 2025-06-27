@@ -1,30 +1,38 @@
 import numpy as np
 
-def regime_vector_distance(a: dict, b: dict) -> float:
+def regime_vector_distance(a, b):
     """
-    Cosine distance between two regime probability vectors
+    Computes cosine distance between two regime probability vectors.
+    Inputs are dicts with regime labels and string/float probabilities.
     """
-    keys = list(a.keys())
-    a_vec = np.array([a[k] for k in keys])
-    b_vec = np.array([b[k] for k in keys])
+    a_vec = np.array([float(v) for v in a.values()])
+    b_vec = np.array([float(v) for v in b.values()])
 
     dot = np.dot(a_vec, b_vec)
-    norms = np.linalg.norm(a_vec) * np.linalg.norm(b_vec)
-    return 1 - dot / (norms + 1e-9)
+    norm = np.linalg.norm(a_vec) * np.linalg.norm(b_vec)
+    cosine_similarity = dot / norm if norm != 0 else 0
+    return 1 - cosine_similarity  # distance = 1 - similarity
 
-def score_velocity(history: list[dict]) -> float:
+
+def score_velocity(history):
     """
-    Measures average regime vector change over last N periods
+    Scores macro regime volatility based on vector drift through time.
+    Input: list of historical regime probability snapshots (dicts)
+    Returns: float velocity score
     """
     if len(history) < 2:
         return 0.0
 
-    distances = [
-        regime_vector_distance(history[i], history[i+1])
-        for i in range(len(history)-1)
-    ]
-    velocity = sum(distances) / len(distances)
-    return round(velocity, 4)
+    distances = []
+    for i in range(len(history) - 1):
+        try:
+            d = regime_vector_distance(history[i], history[i + 1])
+            distances.append(d)
+        except Exception as e:
+            print(f"Error computing distance at step {i}: {e}")
+            continue
 
-def flag_fragility(velocity_score: float, threshold: float = 0.6) -> bool:
-    return velocity_score > threshold
+    if not distances:
+        return 0.0
+
+    return round(sum(distances) / len(distances), 4)

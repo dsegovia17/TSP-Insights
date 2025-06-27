@@ -1,36 +1,52 @@
 def detect_phase_shift(regime_history, coherence_history, velocity, macro_scores, fund_trend_score):
     """
-    Detects if a macro regime phase shift is occurring by analyzing coherence, macro scores,
-    and volatility of narrative shifts.
+    Detects if a macro regime phase shift is occurring by analyzing regime conviction,
+    coherence breakdown, narrative volatility, and macro/fund divergence.
+
+    Returns:
+        - phase_shift_flag: bool
+        - diagnostics: dict with breakdown of drivers
     """
 
-    # Safely extract coherence values
+    # Extract coherence float values safely
     coherence_values = [
         float(entry.get("value", entry)) if isinstance(entry, dict) else float(entry)
         for entry in coherence_history
     ]
-    if len(coherence_values) >= 2:
-        drop = coherence_values[-2] - coherence_values[-1]
-    else:
-        drop = 0.0
+    drop = coherence_values[-2] - coherence_values[-1] if len(coherence_values) >= 2 else 0.0
 
-    # Compute macro momentum delta
-    if len(macro_scores) >= 2:
-        macro_momentum = macro_scores[-1] - macro_scores[-2]
-    else:
-        macro_momentum = 0.0
+    # 1. Regime Drift
+    regime_drift = False
+    if len(regime_history) >= 3:
+        top_probs = [max(d.values()) for d in regime_history[-3:]]
+        regime_drift = (top_probs[0] - top_probs[-1]) > 0.15
 
-    # Logic for detecting phase shift
-    sudden_drop = drop > 0.15
-    volatile_narrative = velocity > 0.2
-    poor_macro_momentum = macro_momentum < -1.5
-    trend_conflict = fund_trend_score < 0
+    # 2. Coherence Drop
+    coherence_collapse = drop > 0.3
 
-    phase_shift_flag = any([sudden_drop, volatile_narrative, poor_macro_momentum, trend_conflict])
+    # 3. Velocity Spike
+    velocity_spike = velocity > 0.6
 
-    return phase_shift_flag, {
+    # 4. Macro vs Trend
+    macro_momentum = macro_scores[-1] - macro_scores[-2] if len(macro_scores) >= 2 else 0.0
+    macro_trend_divergence = macro_scores[-1] < macro_scores[-2] and fund_trend_score > 0
+
+    # Diagnostic breakdown
+    reasons = []
+    if regime_drift: reasons.append("Regime confidence fading")
+    if coherence_collapse: reasons.append("Coherence breakdown")
+    if velocity_spike: reasons.append("Narrative velocity spike")
+    if macro_trend_divergence: reasons.append("Macro softening vs trend resilience")
+
+    phase_shift_flag = any([regime_drift, coherence_collapse, velocity_spike, macro_trend_divergence])
+
+    diagnostics = {
+        "phase_shift": phase_shift_flag,
         "coherence_drop": round(drop, 4),
         "velocity": velocity,
         "macro_momentum": round(macro_momentum, 4),
         "fund_trend_score": round(fund_trend_score, 4),
+        "narrative": " | ".join(reasons) if reasons else "No early instability detected."
     }
+
+    return phase_shift_flag, diagnostics

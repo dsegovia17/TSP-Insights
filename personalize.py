@@ -1,48 +1,30 @@
-from user_profile import UserProfile
-
-def personalize_allocation(base_alloc: dict, user: UserProfile, current_year: int) -> dict:
+def personalize_allocation(base_alloc: dict, user_profile, current_year: int) -> dict:
     """
-    Adjusts base fund allocations based on user profile:
-    - Time horizon to retirement
-    - Risk tolerance
-    Outputs final fund weights (C, S, I, F, G) tailored to the user.
+    Adjusts base TSP allocation based on user profile and market context.
+    Includes risk tolerance scaling and optional glidepath toward retirement.
     """
+    # Normalize risk tolerance input
+    risk_levels = {
+        "aggressive": 1.2,
+        "moderate": 1.0,
+        "conservative": 0.5
+    }
+    risk_input = user_profile.risk_tolerance.lower()
+    risk_multiplier = risk_levels.get(risk_input, 1.0)  # fallback to moderate
 
-    # Step 1: Calculate equity exposure target
-    years_to_retirement = user.years_to_retire(current_year)
-    
-    # Glidepath: maps years → equity exposure (min 30%, max 100%)
-    glide_equity = min(1.0, max(0.3, years_to_retirement / 40))
-    
-    # Risk multiplier
-    risk_multiplier = {
-        "Aggressive": 1.0,
-        "Moderate": 0.75,
-        "Conservative": 0.5
-    }[user.risk_tolerance]
-
-    equity_target = round(glide_equity * risk_multiplier, 2)
-
-    # Step 2: Scale equity allocations
-    equity_funds = ["C", "S", "I"]
-    equity_base = sum(base_alloc[f] for f in equity_funds)
-    equity_scale = equity_target / (equity_base / 100) if equity_base else 0
+    # Calculate years until retirement
+    years_left = max(user_profile.retirement_year - current_year, 0)
+    glide_factor = max(1 - (years_left / 40), 0.3)  # Don't go below 30% risk profile
 
     personalized = {}
-    for fund in equity_funds:
-        personalized[fund] = round(base_alloc[fund] * equity_scale)
+    for fund, weight in base_alloc.items():
+        adjusted = weight * risk_multiplier * glide_factor
+        personalized[fund] = round(adjusted, 2)
 
-    # Step 3: Adjust fixed income (F Fund) relative to remaining risk budget
-    personalized["F"] = round(base_alloc["F"] * (1 - equity_target))
-
-    # Step 4: Put remainder in G Fund
-    used = sum(personalized.values())
-    personalized["G"] = 100 - used
-
-    # Clean up rounding overflow
+    # Rebalance to total 100%
     total = sum(personalized.values())
-    if total != 100:
-        diff = 100 - total
-        personalized["G"] += diff  # absorb into G
+    if total > 0:
+        for fund in personalized:
+            personalized[fund] = round(personalized[fund] * 100 / total, 2)
 
     return personalized
